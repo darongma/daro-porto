@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daro Porto</title>
+    <link rel="icon" type="image/png" href="/static/icon.png">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+</head>
+<body>
+    <div id="splash-screen" class="splash-screen">
+    <div class="splash-content">
+
+        <div class="splash-icon">📸</div>
+        <h1>Daro Porto</h1>
+        <p class="splash-tagline">Let's Celebrate Your Memory</p>
+
+        <!-- STATE A: Location already saved -->
+        <div id="splash-location-saved" style="display:none;">
+            <div class="splash-card">
+                <div class="splash-card-row">
+                    <span class="splash-card-icon">🧭</span>
+                    <div class="splash-card-text">
+                        <span class="splash-card-label">Your Location</span>
+                        <span id="splash-city-name" class="splash-card-value"></span>
+                    </div>
+                </div>
+                <div class="splash-card-row">
+                    <span class="splash-card-icon">🌡️</span>
+                    <div class="splash-card-text">
+                        <span class="splash-card-label">Temperature Unit</span>
+                        <span id="splash-unit-display" class="splash-card-value"></span>
+                    </div>
+                </div>
+                <div class="splash-card-row">
+                    <span class="splash-card-icon">🔄</span>
+                    <div class="splash-card-text">
+                        <span class="splash-card-label">Weather Refresh</span>
+                        <span id="splash-freq-display" class="splash-card-value"></span>
+                    </div>
+                </div>
+                <button class="splash-change-btn" onclick="showLocationInput()">✏️ Change Location &amp; Settings</button>
+            </div>
+            <button id="start-btn" class="splash-enter-btn" onclick="startApp()">▶ Enter</button>
+        </div>
+
+        <!-- STATE B: Ask for location -->
+        <div id="splash-location-input" style="display:none;">
+            <div class="splash-card">
+                <div class="splash-setup-header">
+                    <span>🌍</span>
+                    <span>Set Your Location for Weather</span>
+                </div>
+                <p class="splash-setup-hint">Enter a US ZIP code or any city name.</p>
+                <div class="splash-input-row">
+                    <span class="splash-input-icon">📍</span>
+                    <input type="text" id="splash-zip-input" class="splash-input"
+                        placeholder="e.g. 91789  or  Los Angeles"
+                        maxlength="60"
+                        onkeydown="if(event.key==='Enter') saveLocation()">
+                    <button class="splash-lookup-btn" onclick="saveLocation()">→</button>
+                </div>
+                <div class="splash-card-divider"></div>
+                <div class="splash-selects-row">
+                    <div class="splash-select-group">
+                        <label class="splash-card-label">🌡️ Temperature</label>
+                        <select id="splash-unit-select" class="splash-select">
+                            <option value="F">°F Fahrenheit</option>
+                            <option value="C">°C Celsius</option>
+                        </select>
+                    </div>
+                    <div class="splash-select-group">
+                        <label class="splash-card-label">🔄 Refresh Every</label>
+                        <select id="splash-freq-select" class="splash-select">
+                            <option value="1">1 hour</option>
+                            <option value="2">2 hours</option>
+                            <option value="3">3 hours</option>
+                            <option value="6" selected>6 hours</option>
+                            <option value="12">12 hours</option>
+                            <option value="24">24 hours</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="splash-location-error" class="splash-error" style="display:none;"></div>
+                <div id="splash-location-loading" class="splash-loading" style="display:none;">🔍 Looking up your location...</div>
+            </div>
+            <button class="splash-enter-btn splash-enter-btn--secondary" onclick="startApp()">Skip &amp; Enter</button>
+        </div>
+
+    </div>
+</div>
+
+    <video id="bg-video" loop muted autoplay playsinline class="bg-video"></video>
+
+    <div id="slideshow-container" class="slideshow-container">
+        </div>
+
+    <div class="menu-icon" onclick="toggleMenu()">
+        <i class="fas fa-bars"></i>
+    </div>
+
+    <div id="side-menu" class="side-menu">
+    <a href="#" onclick="showOverlay('settings')">⚙️ Settings</a>
+    <a href="#" onclick="showOverlay('status')">📊 System Status</a>
+    <a href="#" onclick="showOverlay('credit')">📜 Credits</a>
+    <a href="#" onclick="toggleFullScreen()">📺 Toggle Full Screen</a>
+    
+    <a href="#" onclick="closeMenu()" class="close-btn">❌</a>
+</div>
+
+
+<div id="music-info" class="music-info-widget" onclick="toggleMusicWidget(event)">
+
+    <!-- COMPACT ROW -->
+    <div class="music-compact">
+        <div class="music-icon-wrapper">
+            <span id="music-default-icon">🎵</span>
+            <img id="music-album-art" src="" alt="" crossorigin="anonymous" style="display:none;">
+        </div>
+        <div class="music-text">
+            <div class="marquee-wrapper"><span id="song-title"></span></div>
+            <div class="marquee-wrapper"><span id="song-artist"></span></div>
+            <div class="marquee-wrapper"><span id="song-album" class="song-album"></span></div>
+        </div>
+        <span class="music-expand-hint" id="music-expand-arrow">
+            <i class="fas fa-chevron-down"></i>
+        </span>
+    </div>
+
+    <!-- EXPANDED PANEL -->
+    <div class="music-expanded" id="music-expanded">
+
+        <div class="music-visualizer" id="music-visualizer">
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <span></span>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="music-progress-wrap" onclick="event.stopPropagation()">
+            <span id="music-current-time" class="music-time">0:00</span>
+            <input type="range" id="music-seek" class="music-seek" value="0" min="0" step="1"
+                oninput="seekTo(this.value)">
+            <span id="music-duration" class="music-time">0:00</span>
+        </div>
+
+        <!-- Controls -->
+        <div class="music-controls" onclick="event.stopPropagation()">
+            <button class="mc-btn" onclick="toggleShuffle()" id="btn-shuffle" title="Shuffle">
+                <i class="fas fa-shuffle"></i>
+            </button>
+            <button class="mc-btn mc-btn--main" onclick="playPrevious()" title="Previous">
+                <i class="fas fa-backward-step"></i>
+            </button>
+            <button class="mc-btn mc-btn--play" id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause">
+                <i class="fas fa-pause"></i>
+            </button>
+            <button class="mc-btn mc-btn--main" onclick="playNext()" title="Next">
+                <i class="fas fa-forward-step"></i>
+            </button>
+            <button class="mc-btn" onclick="cycleRepeat()" id="btn-repeat" title="Repeat">
+                <i class="fas fa-repeat"></i>
+            </button>
+        </div>
+
+        <!-- Volume -->
+        <div class="music-volume-row" onclick="event.stopPropagation()">
+            <i class="fas fa-volume-low music-vol-icon"></i>
+            <input type="range" id="music-volume" class="music-seek" value="50" min="0" max="100"
+                oninput="setVolume(this.value)">
+            <i class="fas fa-volume-high music-vol-icon"></i>
+        </div>
+
+        <!-- Lyrics Section -->
+        <div class="music-section" onclick="event.stopPropagation()">
+            <div class="music-section-header" onclick="toggleMusicSection('lyrics')">
+                <span>🎤 Lyrics</span>
+                <i class="fas fa-chevron-down music-section-arrow" id="arrow-lyrics"></i>
+            </div>
+            <div class="music-section-body" id="section-lyrics">
+                <div class="music-lyrics-wrap">
+                    <div id="music-lyrics" class="music-lyrics">
+                        <span class="lyrics-placeholder">♪ No lyrics available</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Song List Section -->
+        <div class="music-section" onclick="event.stopPropagation()">
+            <div class="music-section-header" onclick="toggleMusicSection('playlist')">
+                <span>🎵 Playlist <span id="playlist-count" class="playlist-count"></span></span>
+                <i class="fas fa-chevron-down music-section-arrow" id="arrow-playlist"></i>
+            </div>
+            <div class="music-section-body" id="section-playlist">
+                <div class="playlist-search-wrap">
+                    <i class="fas fa-magnifying-glass playlist-search-icon"></i>
+                    <input type="text" id="playlist-search" class="playlist-search"
+                        placeholder="Search songs..."
+                        oninput="filterPlaylist(this.value)"
+                        onclick="event.stopPropagation()">
+                </div>
+                <div id="playlist-list" class="playlist-list"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+    <div class="info-widget bottom-left">
+    <div id="clock-date-block" onclick="toggleCalendar()" style="cursor:pointer;">
+        <div id="clock" class="clock">00:00</div>
+        <div id="date" class="date">Monday, Jan 1</div>
+    </div>
+    <div id="calendar-widget" class="calendar-widget"></div>
+    <div id="weather" class="weather" onclick="toggleForecast()" style="cursor:pointer;">Loading Weather Forecast...</div>
+    <div id="weather-forecast" class="weather-forecast"></div>
+    </div>
+
+    <div class="info-widget bottom-right" id="photo-info-stack"></div>
+
+    <div id="modal-overlay" class="modal-overlay" onclick="closeOverlay()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2 id="modal-title">Title</h2>
+            <div id="modal-body">Content</div>
+            <a class="close-btn" onclick="closeOverlay()">❌</>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script src="/static/ui.js"></script>
+    <script src="/static/music.js"></script>
+    <script src="/static/weather.js"></script>
+    <script src="/static/slideshow.js"></script>
+</body>
+</html>

@@ -1,0 +1,1380 @@
+:root {
+    --transition-speed: 1.5s; /* Slow, smooth fade */
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: white;
+}
+
+/* Background Video */
+.bg-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -2;
+    opacity: 0.6;
+    filter: blur(5px);
+}
+
+/* This forces the images to stay in a row */
+.slideshow-container {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* On a portrait screen, two paired photos stack vertically instead of side by side */
+@media (orientation: portrait) {
+    .slideshow-container.layout-2 {
+        flex-direction: column !important;
+    }
+}
+
+/* Each 50% half of the screen */
+.photo-wrapper {
+    position: relative;
+    flex: 1; 
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #000;
+}
+
+/* Background Blur */
+.blur-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: blur(40px) brightness(0.5);
+    z-index: 1;
+    transform: scale(1.1);
+}
+
+/* The Foreground Photo */
+.slide-photo {
+    position: relative;
+    z-index: 2;
+    /* This forces the photo to hit the edges of the wrapper */
+    width: 100% !important;
+    height: 100% !important;
+    /* 'cover' crops the top/bottom slightly so the sides hit the edges */
+    object-fit: cover !important; 
+    display: block;
+    will-change: transform;
+}
+
+/* Optional: If you want a single photo to NOT crop, but 2 photos TO crop */
+.layout-1 .slide-photo {
+    object-fit: contain !important; /* Single photo shows entirely */
+}
+
+.layout-2 .slide-photo {
+    object-fit: cover !important; /* Paired photos fill their halves edge-to-edge */
+}
+
+/* Transition for the whole wrapper */
+.fade-in {
+    animation: fadeInScene 1.5s ease-in-out forwards;
+}
+
+@keyframes fadeInScene {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Transition Classes */
+.slide-up { transform: translateY(50px); opacity: 0; }
+
+/* UI Overlays */
+.info-widget {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    padding: 15px;
+    border-radius: 10px;
+    text-shadow: 1px 1px 2px black;
+    z-index: 10;
+}
+
+.info-row{
+    font-size: 1.5em;
+}
+
+.bottom-left { bottom: 20px; left: 20px; text-align: left; }
+
+.bottom-right { bottom: 20px; right: 20px; text-align: left; font-size: 0.9em; opacity: 0.8; }
+
+.clock { font-size: 3.9em; font-weight: bold; line-height: 1; }
+.date { font-size: 1.5em;  }
+.weather { font-size: 1.5em; margin-top: 10px;  font-weight: bold; }
+
+/* --- MENU BUTTON --- */
+.menu-icon {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-size: 1.5em;
+    cursor: pointer;
+    z-index: 100; /* Above the photos */
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(5px);
+    padding: 12px;
+    border-radius: 8px;
+    color: white;
+    transition: background 0.3s;
+}
+
+.menu-icon:hover {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+/* --- THE SIDE MENU CONTAINER --- */
+.side-menu {
+    height: 0; /* JavaScript toggles this to 100% */
+    width: 20%;
+    position: fixed; /* Ensures it stays on top of the viewport */
+    z-index: 1001;   /* Higher than the menu icon and photos */
+    top: 0;
+    left: 0;
+    background-color: rgba(17, 17, 17, 0.98); /* Near-black with slight transparency */
+    overflow: hidden; /* Prevents seeing links when height is 0 */
+    transition: 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* Smoother "slide" feel */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Centers links vertically in the full screen */
+    align-items: center;    /* Centers links horizontally */
+}
+
+/* --- MENU LINKS --- */
+.side-menu a {
+    padding: 15px 25px;
+    text-decoration: none;
+    font-size: 24px; /* Larger for easy touch/click on displays */
+    color: #bbb;
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Spacing between emoji and text */
+    transition: all 0.3s ease;
+    width: 100%;
+    max-width: 300px; /* Keeps the links contained in the center */
+    border-left: 4px solid transparent;
+    margin: 5px 0;
+}
+
+.side-menu a:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 4px solid #50fa7b; /* Emerald green highlight */
+    padding-left: 35px; /* Subtle "slide right" effect on hover */
+}
+
+/* --- CLOSE BUTTON --- */
+.side-menu .close-btn {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    font-size: 36px;
+    color: #818181;
+    cursor: pointer;
+    width: auto; /* Overrides the 100% width of standard links */
+}
+
+.side-menu .close-btn:hover {
+    color: #f1f1f1;
+    background: none;
+    border-left: none;
+}
+
+/* --- FULLSCREEN SPECIFIC STYLE --- */
+.side-menu a[onclick*="toggleFullScreen"] {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 20px;
+    padding-top: 25px;
+    color: #ffb86c; /* Orange tint to separate from system links */
+}
+
+.modal-overlay {
+    display: none; position: fixed; z-index: 200;
+    left: 0; top: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.9);
+    justify-content: center; align-items: center;
+
+}
+
+/* --- SPLASH SCREEN --- */
+.splash-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #0d0d0d 100%);
+    display: flex; justify-content: center;
+    align-items: center; z-index: 1000; transition: opacity 1s;
+}
+
+.splash-content {
+    text-align: center;
+    max-width: 480px;
+    width: 90%;
+    padding: 20px;
+}
+
+.splash-icon {
+    font-size: 4em;
+    margin-bottom: 10px;
+    animation: pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 15px rgba(80, 250, 123, 0.3)); }
+    50%       { filter: drop-shadow(0 0 30px rgba(80, 250, 123, 0.7)); }
+}
+
+.splash-content h1 {
+    font-size: 2.8em;
+    letter-spacing: 4px;
+    margin: 0 0 8px 0;
+    background: linear-gradient(135deg, #ffffff 0%, #50fa7b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.splash-tagline {
+    font-size: 0.95em;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 1.5px;
+    font-style: italic;
+    margin: 0 0 28px 0;
+}
+
+/* Glass Card */
+.splash-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.07);
+    text-align: left;
+}
+
+.splash-card-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.splash-card-row:last-of-type { border-bottom: none; }
+
+.splash-card-icon {
+    font-size: 1.5em;
+    flex-shrink: 0;
+    width: 36px;
+    text-align: center;
+}
+
+.splash-card-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.splash-card-label {
+    font-size: 0.7em;
+    color: #50fa7b;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    font-weight: 600;
+}
+
+.splash-card-value {
+    font-size: 1.05em;
+    color: #efefef;
+    font-weight: 500;
+    margin-top: 3px;
+}
+
+.splash-setup-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: #50fa7b;
+    margin-bottom: 4px;
+}
+
+.splash-setup-hint {
+    font-size: 0.82em;
+    color: rgba(255,255,255,0.35);
+    margin: 0 0 14px 0;
+}
+
+.splash-input-row {
+    display: flex;
+    align-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.25);
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.splash-input-row:focus-within {
+    border-color: #50fa7b;
+    box-shadow: 0 0 0 3px rgba(80, 250, 123, 0.12);
+}
+
+.splash-input-icon {
+    padding: 0 10px;
+    font-size: 1em;
+    opacity: 0.5;
+}
+
+.splash-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1em;
+    padding: 13px 4px;
+    outline: none;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+.splash-input::placeholder { color: rgba(255,255,255,0.22); }
+
+.splash-lookup-btn {
+    background: rgba(80, 250, 123, 0.12);
+    border: none;
+    border-left: 1px solid rgba(255,255,255,0.08);
+    color: #50fa7b;
+    font-size: 1.3em;
+    padding: 12px 18px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.splash-lookup-btn:hover { background: rgba(80, 250, 123, 0.28); }
+
+/* Primary Enter button */
+.splash-enter-btn {
+    width: 100%;
+    padding: 15px 30px;
+    font-size: 1.05em;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #50fa7b, #2ecc71);
+    color: #111;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 20px rgba(80, 250, 123, 0.35);
+}
+.splash-enter-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(80, 250, 123, 0.5);
+}
+.splash-enter-btn:active { transform: scale(0.98); }
+
+/* Secondary / skip button */
+.splash-enter-btn--secondary {
+    background: transparent;
+    color: rgba(255,255,255,0.28);
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: none;
+    font-size: 0.8em;
+    padding: 10px 20px;
+    margin-top: 8px;
+    letter-spacing: 1px;
+}
+.splash-enter-btn--secondary:hover {
+    color: rgba(255,255,255,0.55);
+    border-color: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.04);
+    transform: none;
+    box-shadow: none;
+}
+
+/* Change location link */
+.splash-change-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.28);
+    font-size: 0.78em;
+    cursor: pointer;
+    margin-top: 10px;
+    letter-spacing: 0.5px;
+    transition: color 0.2s;
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 6px;
+}
+.splash-change-btn:hover { color: rgba(255, 255, 255, 0.65); }
+
+.splash-error {
+    color: #ff7070;
+    font-size: 0.82em;
+    margin-top: 10px;
+    text-align: center;
+    padding: 8px 12px;
+    background: rgba(255, 80, 80, 0.08);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 80, 80, 0.2);
+}
+
+.splash-loading {
+    font-size: 0.85em;
+    color: #50fa7b;
+    margin-top: 12px;
+    text-align: center;
+    opacity: 0.75;
+}
+
+.splash-card-divider {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    margin: 14px 0 10px;
+}
+
+.splash-selects-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 4px;
+}
+
+.splash-select-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.splash-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ddd;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 0.88em;
+    cursor: pointer;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+}
+
+.splash-select:focus {
+    border-color: #50fa7b;
+}
+
+.splash-select option {
+    background: #1a1a2e;
+    color: #fff;
+}
+
+.close-btn{
+    position: absolute;
+    top:10px;
+    right:10px;
+    font-size: 36px;
+    cursor: pointer;
+}
+
+.info-sep {
+    color: rgba(255,255,255,0.4);
+    font-weight: normal;
+}
+
+#music-duration{text-align: right;}
+
+.music-info-widget {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.55);
+    /*border: 1px solid rgba(255, 255, 255, 0.12);*/
+    border-radius: 16px;
+    backdrop-filter: blur(16px);
+    width: 360px;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow: hidden;
+}
+
+.music-info-widget.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+/* Compact row */
+.music-compact {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+}
+
+.music-icon-wrapper {
+    width: 66px;
+    height: 66px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    font-size: 1.6em;
+}
+
+#music-album-art {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.music-text {
+    flex: 1;
+    overflow: hidden;
+}
+
+#song-title {
+    display: block;
+    font-weight: 600;
+    font-size: 1.25em;
+    color: #fff;
+}
+
+#song-artist {
+    display: block;
+    font-size: 1.05em;
+    color: rgba(255,255,255,0.5);
+}
+.marquee-wrapper {
+    overflow: hidden;
+    white-space: nowrap;
+    width: 100%;
+}
+
+#song-title,
+#song-artist {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+#song-title.overflowing,
+#song-artist.overflowing {
+    animation: marquee-scroll 8s linear infinite;
+    animation-delay: 1.5s;
+}
+
+@keyframes marquee-scroll {
+    0%   { transform: translateX(0%); }
+    40%  { transform: translateX(calc(-100% + var(--wrapper-width, 200px))); }
+    60%  { transform: translateX(calc(-100% + var(--wrapper-width, 200px))); }
+    100% { transform: translateX(0%); }
+}
+
+.music-expand-hint {
+    color: rgba(255,255,255,0.3);
+    font-size: 0.75em;
+    transition: transform 0.3s ease, color 0.3s;
+    flex-shrink: 0;
+}
+
+.music-expand-hint--open {
+    transform: rotate(180deg);
+    color: #50fa7b;
+}
+
+.music-expanded {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    /* Use a slightly faster timing for a snappier feel */
+    transition: max-height 0.4s ease-out, opacity 0.3s ease;
+}
+
+.music-expanded--visible {
+    /* Pick a number larger than your content will ever be */
+    max-height: 900px; 
+    opacity: 1;
+}
+
+/* Progress bar */
+.music-progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 14px 0;
+}
+
+.music-time {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.4);
+    min-width: 32px;
+}
+
+.music-seek {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.15);
+    outline: none;
+    cursor: pointer;
+}
+
+.music-seek::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #50fa7b;
+    cursor: pointer;
+}
+
+/* Controls */
+.music-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+}
+
+.mc-btn {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.7);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+
+.mc-btn:hover {
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    transform: scale(1.08);
+}
+
+.mc-btn--play {
+    width: 46px;
+    height: 46px;
+    font-size: 1.05em;
+    background: #50fa7b;
+    color: #111;
+    border: none;
+}
+
+.mc-btn--play:hover {
+    background: #6ffb8f;
+    color: #111;
+}
+
+.mc-btn--main {
+    width: 40px;
+    height: 40px;
+    font-size: 0.95em;
+}
+
+.mc-btn--active {
+    color: #50fa7b !important;
+    border-color: rgba(80, 250, 123, 0.4) !important;
+    background: rgba(80, 250, 123, 0.08) !important;
+}
+
+/* Volume */
+.music-volume-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px 10px;
+}
+
+.music-vol-icon {
+    color: rgba(255,255,255,0.35);
+    font-size: 0.8em;
+}
+
+/* Lyrics */
+.music-lyrics-wrap {
+    border-top: 1px solid rgba(255,255,255,0.07);
+    max-height: 160px;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.music-lyrics-wrap::-webkit-scrollbar { display: none; }
+
+.music-lyrics {
+    padding: 10px 14px 14px;
+    text-align: center;
+}
+
+.lyric-line {
+    font-size: 0.82em;
+    color: rgba(255,255,255,0.3);
+    padding: 4px 0;
+    transition: color 0.3s, font-size 0.3s;
+    line-height: 1.5;
+}
+
+.lyric-timed.lyric-active {
+    color: #fff;
+    font-size: 0.92em;
+    font-weight: 600;
+}
+
+.lyrics-placeholder {
+    font-size: 0.8em;
+    color: rgba(255,255,255,0.2);
+    padding: 16px 0;
+    display: block;
+}
+
+/* Album subtitle in compact row */
+.song-album {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.3);
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Collapsible section headers */
+.music-section {
+    border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.music-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.82em;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    transition: color 0.2s;
+    user-select: none;
+}
+
+.music-section-header:hover {
+    color: rgba(255,255,255,0.85);
+}
+
+.music-section-arrow {
+    font-size: 0.75em;
+    transition: transform 0.3s ease;
+}
+
+.music-section-arrow--open {
+    transform: rotate(180deg);
+}
+
+/* Section body — animated collapse */
+.music-section-body {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease;
+}
+
+.music-section-body--open {
+    max-height: 240px;
+    opacity: 1;
+}
+
+/* Lyrics inside section */
+.music-lyrics-wrap {
+    overflow-y: auto;
+    scrollbar-width: none;
+    max-height: 200px;
+}
+.music-lyrics-wrap::-webkit-scrollbar { display: none; }
+
+.music-lyrics {
+    padding: 6px 14px 12px;
+    text-align: center;
+}
+
+/* Playlist search */
+.playlist-search-wrap {
+    display: flex;
+    align-items: center;
+    margin: 0 12px 8px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 0 10px;
+}
+
+.playlist-search-icon {
+    color: rgba(255,255,255,0.25);
+    font-size: 0.75em;
+    flex-shrink: 0;
+}
+
+.playlist-search {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 0.82em;
+    padding: 8px 8px;
+    outline: none;
+    width: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+.playlist-search::placeholder { color: rgba(255,255,255,0.2); }
+
+/* Playlist list */
+.playlist-list {
+    overflow-y: auto;
+    max-height: 180px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.playlist-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-radius: 6px;
+    margin: 0 4px;
+}
+
+.playlist-item:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+.playlist-item--active {
+    background: rgba(80, 250, 123, 0.08);
+}
+
+.playlist-item-num {
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.playlist-num {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.25);
+}
+
+.playlist-playing-icon {
+    color: #50fa7b;
+    font-size: 0.8em;
+    animation: pulse-volume 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-volume {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+}
+
+.playlist-item-info {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.playlist-item-title {
+    font-size: 0.83em;
+    color: #eee;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.playlist-item--active .playlist-item-title {
+    color: #50fa7b;
+    font-weight: 600;
+}
+
+.playlist-item-artist {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.35);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.playlist-item-duration {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.25);
+    flex-shrink: 0;
+    font-family: monospace;
+}
+
+/* Playlist count badge */
+.playlist-count {
+    color: rgba(255,255,255,0.3);
+    font-weight: normal;
+    font-size: 0.9em;
+}
+
+
+.music-visualizer {
+    display: flex;
+    align-items: flex-end; /* Keeps bars on the floor */
+    justify-content: center;
+    gap: 4px;
+    height: 40px; 
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+
+
+.music-visualizer span {
+    width: 5px;
+    height: 30%; 
+    background: #1db954;
+    border-radius: 2px 2px 0 0;
+    transition: background 0.8s ease, box-shadow 0.8s ease, height 0.2s ease;
+    /* This creates the initial glow */
+    box-shadow: 0 -2px 10px rgba(29, 185, 84, 0.3);
+}
+
+.music-info-widget {
+    /* Your existing styles... */
+    transition: background 1.5s ease-in-out; /* Slow fade between song colors */
+    background: #121212; /* Fallback dark background */
+    overflow: hidden; /* Keeps the gradient inside rounded corners */
+}
+
+/* 1. THE TRIGGER: Match this name to the @keyframes below */
+.music-visualizer.is-playing span {
+    animation: visualizer-dance 1s ease-in-out infinite;
+}
+
+/* 2. THE ANIMATION: Unified name and logic */
+@keyframes visualizer-dance {
+    0%, 100% { 
+        height: 30%; 
+        opacity: 0.6;
+    }
+    50% { 
+        height: 100%; 
+        opacity: 1;
+    }
+}
+
+/* 3. STAGGERED DELAYS: Keeps them from moving as one block */
+.music-visualizer span:nth-child(1) { animation-delay: 0.1s; }
+.music-visualizer span:nth-child(2) { animation-delay: 0.3s; }
+.music-visualizer span:nth-child(3) { animation-delay: 0.6s; }
+.music-visualizer span:nth-child(4) { animation-delay: 0.2s; }
+.music-visualizer span:nth-child(5) { animation-delay: 0.5s; }
+.music-visualizer span:nth-child(6) { animation-delay: 0.4s; }
+.music-visualizer span:nth-child(7) { animation-delay: 0.7s; }
+
+/* --- MUSIC WIDGET ---========================================================================================= */
+
+/* --- PORTRAIT ADAPTATION --- */
+@media (orientation: portrait) {
+    .slideshow-container.layout-2 {
+        flex-direction: column;
+    }
+    .side-menu {
+        width: 30%; /* Wider menu for vertical screens */
+    }
+    
+    .side-menu a {
+        font-size: 22px; /* Slightly adjust text size if needed for the narrower space */
+        max-width: 90%;  /* Ensure links don't bleed out */
+    }
+
+    #photo-info-stack{
+    max-width: 60%;
+    overflow: hidden;
+    }
+    #photo-info-stack span{
+    display: inline-block; /* This makes the span act like a "chunk" that won't split */
+    white-space: nowrap;
+    }
+}
+
+
+
+/* --- MODAL DASHBOARD STYLES --- */
+.modal-content{
+    width:50%;
+}
+#modal-body {
+    padding: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.status-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hw-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-item {
+    background: rgba(80, 250, 123, 0.1);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(80, 250, 123, 0.2);
+}
+
+.category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+    color: #50fa7b;
+}
+
+.folder-table {
+    width: 100%;
+    font-size: 0.85em;
+    border-collapse: collapse;
+}
+
+.folder-table tr {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.folder-table td {
+    padding: 8px 4px;
+    color: #ccc;
+}
+
+.btn-refresh {
+    width: 100%;
+    padding: 14px;
+    background: #50fa7b;
+    border: 0;
+    border-radius: 8px;
+    color: #111;
+    font-weight: bold;
+    font-size: 1em;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    transition: transform 0.2s;
+}
+
+.btn-refresh:active {
+    transform: scale(0.98);
+}
+
+
+
+
+/* --- MODERN SETTINGS UI --- */
+.settings-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-bottom: 20px;
+}
+
+/* Glass-style Cards */
+.settings-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.settings-card h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.1em;
+    color: #50fa7b;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Row Layouts */
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.setting-row:last-child { border-bottom: none; }
+
+.setting-label {
+    font-size: 0.95em;
+    color: #efefef;
+}
+
+/* Form Controls */
+.setting-control {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9em;
+    transition: border-color 0.3s;
+}
+
+.setting-control:focus {
+    border-color: #50fa7b;
+    outline: none;
+}
+
+/* Path List Styling */
+.path-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 8px;
+}
+
+.path-item input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #ccc;
+    font-family: monospace;
+}
+
+.btn-remove {
+    color: #ff5555;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2em;
+}
+
+.btn-add {
+    margin-top: 10px;
+    background: transparent;
+    border: 1px dashed #50fa7b;
+    color: #50fa7b;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.btn-add:hover {
+    background: rgba(80, 250, 123, 0.1);
+}
+
+/* Sticky Save Bar */
+.save-bar {
+    position: sticky;
+    bottom: -10px;
+    background: rgba(17, 17, 17, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 20px 0;
+    margin-top: 20px;
+}
+
+
+
+
+
+.forecast-day {
+    display: grid;
+    grid-template-columns: 80px 28px 36px 36px 66px;
+    align-items: center;
+    gap: 4px;
+    font-size: 1.1em;
+}
+
+.forecast-label { color: #fff; }
+.forecast-icon  { font-size: 1.3em; }
+.forecast-hi    { color: #fff; font-weight: 600; text-align: right; }
+.forecast-lo    { color: rgba(255,255,255,0.45); text-align: right; }
+.forecast-date  { color: rgba(255, 180, 80, 0.9);  text-align: right; font-size: 0.9em; }
+
+
+
+/* Forecast toggle */
+.weather-forecast {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 0;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.4s ease, padding-top 0.4s ease, margin-top 0.4s ease;
+}
+.weather-forecast.forecast-visible {
+    max-height: 300px;
+    opacity: 1;
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+/* Calendar widget */
+.calendar-widget {
+    display: block;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    transition: max-height 0.4s ease, opacity 0.4s ease, padding-top 0.4s ease, margin-top 0.4s ease;
+}
+.calendar-widget.calendar-visible {
+    max-height: 300px;
+    opacity: 1;
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+
+
+.cal-month{
+    font-weight: bold;
+    font-size: 1.2em;
+}
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    text-align: center;
+}
+
+.cal-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3px 1px;
+    border-radius: 4px;
+    cursor: default;
+    line-height: 1.2;
+}
+
+.cal-solar {
+    font-size: 0.95em;
+    color: #fff;
+}
+
+.cal-lunar {
+    font-size: 0.75em;
+    color: rgba(255, 180, 80, 0.9);  /* warm amber for lunar */
+    letter-spacing: 0px;
+}
+
+.cal-today {
+    background: #50fa7b;
+    border-radius: 6px;
+}
+
+.cal-today .cal-solar {
+    color: #111;
+    font-weight: 700;
+}
+
+.cal-today .cal-lunar {
+    color: rgba(0, 0, 0, 0.5);
+}
+
+
+
+/*  SWIPING */
+#slideshow-container {
+    /* Must be 'none' so we receive ALL touch events and can handle axis-locking ourselves.
+       pan-y would let the browser steal horizontal events before our JS can preventDefault. */
+    touch-action: none;
+    cursor: grab;
+    will-change: transform;
+}
+
+#slideshow-container:active {
+    cursor: grabbing;
+}
+
+/* Peek layer — next/prev photo ghost that rides alongside during drag */
+#swipe-peek {
+    will-change: transform;
+    background: #000;
+}
+
+/* Update your CSS to ensure the slide is visible */
+.slide-photo {
+    position: relative;
+    z-index: 2;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important; 
+    display: block;
+    will-change: transform, opacity; /* Optimizes for Portal hardware */
+}
+
+/* Slide from Right (Next) */
+@keyframes slideNext {
+    from { transform: translateX(20%); opacity: 0; } /* 20% feels smoother than 100% */
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Slide from Left (Previous) */
+@keyframes slidePrev {
+    from { transform: translateX(-20%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.slide-next {
+    animation: slideNext 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+.slide-prev {
+    animation: slidePrev 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
