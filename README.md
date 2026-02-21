@@ -28,12 +28,21 @@ Transform your Facebook Portal, tablet, or smart TV into a professional, locatio
 
 ![App Screenshot](screenshots/IMG_0704.JPG)
 
-![App Screenshot](screenshots/IMG_0705.JPG)
-
-![App Screenshot](screenshots/IMG_0706.JPG)
-
 ![App Screenshot](screenshots/IMG_0707.JPG)
 
+![App Screenshot](screenshots/IMG_0003.PNG)
+
+![App Screenshot](screenshots/IMG_0004.PNG)
+
+![App Screenshot](screenshots/IMG_0015.PNG)
+
+![App Screenshot](screenshots/IMG_0017.PNG)
+
+![App Screenshot](screenshots/IMG_0018.PNG)
+
+![App Screenshot](screenshots/IMG_0020.PNG)
+
+![App Screenshot](screenshots/IMG_0021.PNG)
 
 
 ## 🛠️ How to Install
