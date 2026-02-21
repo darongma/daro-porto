@@ -21,6 +21,21 @@ Transform your Facebook Portal, tablet, or smart TV into a professional, locatio
 
 ---
 
+
+![App Screenshot](screenshots/IMG_0701.JPG)
+
+![App Screenshot](screenshots/IMG_0703.JPG)
+
+![App Screenshot](screenshots/IMG_0704.JPG)
+
+![App Screenshot](screenshots/IMG_0705.JPG)
+
+![App Screenshot](screenshots/IMG_0706.JPG)
+
+![App Screenshot](screenshots/IMG_0707.JPG)
+
+
+
 ## 🛠️ How to Install
 
 ### 1. Download the Project
@@ -35,11 +50,11 @@ pip install fastapi uvicorn httpx mutagen pillow psutil jinja2
 3. Add Your Media
 Place your files in the following folders:
 
-📷 Photos: /media/photos
+📷 Photos: /media/photos (".jpg",".jpeg",".png",".webp")
 
-🎵 Music: /media/music
+🎵 Music: /media/music (".mp3")
 
-🎥 Videos: /media/videos
+🎥 Videos: /media/videos (".mp4",".mov",".avi", Video Will Be Supported Soon!!!)
 
 🚀 How to Run
 1. Launch the Server
