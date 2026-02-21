@@ -4,8 +4,12 @@
 lyrics/
 music_art/
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 *.json
+test.py
+debug.py
 
 # --- Python Environment ---
 __pycache__/
