@@ -8,8 +8,8 @@
    SHARED UI HELPERS
    ============================================================ */
 
-const createSettingRow = (label, control) => `
-    <div class="setting-row">
+const createSettingRow = (label, control, rowId = '', display = 'flex') => `
+    <div class="setting-row" ${rowId ? `id="${rowId}"` : ''} style="display:${display}">
         <span class="setting-label">${label}</span>
         ${control}
     </div>
@@ -124,6 +124,15 @@ async function renderSettings(titleEl, bodyEl) {
                     <option value="video"  ${cfg.mode === 'video'  ? 'selected' : ''}>🎬 Videos Only</option>
                     <option value="hybrid" ${cfg.mode === 'hybrid' ? 'selected' : ''}>🔄 Hybrid Mix</option>
                 </select>`)}
+            ${createSettingRow("Cache Mode", `
+                <select id="set-dev" class="setting-control" onchange="document.getElementById('version-row').style.display=this.value==='false'?'flex':'none'">
+                    <option value="true"  ${cfg.dev !== false ? 'selected' : ''}>🔧 Dev — bust cache on every restart</option>
+                    <option value="false" ${cfg.dev === false ? 'selected' : ''}>🚀 Prod — use fixed version string</option>
+                </select>`)}
+            ${createSettingRow("Version String", `
+                <input type="text" id="set-version" class="setting-control" style="width:100px"
+                    value="${cfg.version ?? '1.0.0'}" placeholder="e.g. 1.0.0">`,
+                'version-row', cfg.dev !== false ? 'none' : 'flex')}
         `);
 
         const photoCard = createCard("Photo Settings", "📸", `
@@ -166,6 +175,12 @@ async function renderSettings(titleEl, bodyEl) {
         `);
 
         const videoCard = createCard("Video Settings", "🎬", `
+            ${createSettingRow("Clip Duration", `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="number" id="set-video-duration" class="setting-control" style="width:70px"
+                        value="${cfg.video?.duration ?? 30}" min="1">
+                    <span style="font-size:0.8em; color:#888;">sec</span>
+                </div>`)}
             ${createSettingRow("Volume", `
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input type="number" id="set-video-volume" class="setting-control" style="width:70px"
@@ -177,9 +192,15 @@ async function renderSettings(titleEl, bodyEl) {
                     <option value="true"  ${cfg.video?.shuffle  ? 'selected' : ''}>🔀 On</option>
                     <option value="false" ${!cfg.video?.shuffle ? 'selected' : ''}>➡️ Off</option>
                 </select>`)}
+            ${createSettingRow("Photos Between Video (Hybrid Mode)", `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="number" id="set-video-every" class="setting-control" style="width:70px"
+                        value="${cfg.video?.every ?? 7}" min="1">
+                    <span style="font-size:0.8em; color:#888;">Photos</span>
+                </div>`)}
         `);
 
-        const sources = createCard("Media Source Folders", "📂", `
+        const sources = createCard("Media Source", "📂", `
             <div class="path-section">
                 <label>📸 Photo Libraries</label>
                 <div id="path-list-photos">${renderPathRows(cfg.photo?.folders ?? [])}</div>
@@ -195,7 +216,7 @@ async function renderSettings(titleEl, bodyEl) {
                 <div id="path-list-music">${renderPathRows(cfg.music?.folders ?? [])}</div>
                 <button class="btn-add" onclick="addPathRow('path-list-music')">+ Add Music Folder</button>
             </div>
-        `, "Input full directory paths from your server.");
+        `, "");
 
         bodyEl.innerHTML = `
             <div class="settings-container">
@@ -219,6 +240,8 @@ async function renderSettings(titleEl, bodyEl) {
 
 async function saveSettings() {
     const newConfig = {
+        dev:     document.getElementById('set-dev').value === 'true',
+        version: document.getElementById('set-version').value.trim() || '1.0.0',
         mode: document.getElementById('set-mode').value,
         photo: {
             duration:   parseInt(document.getElementById('set-duration').value),
@@ -235,10 +258,12 @@ async function saveSettings() {
             extensions: [".mp3"]
         },
         video: {
+            duration:   parseInt(document.getElementById('set-video-duration').value),
             volume:     parseInt(document.getElementById('set-video-volume').value),
             shuffle:    document.getElementById('set-video-shuffle').value === 'true',
+            every:      parseInt(document.getElementById('set-video-every').value),
             folders:    [...document.querySelectorAll('#path-list-videos .path-entry')].map(i => i.value).filter(Boolean),
-            extensions: [".mp4", ".mov", ".avi"]
+            extensions: [".mp4", ".mov"]
         }
     };
 

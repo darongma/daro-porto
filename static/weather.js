@@ -92,6 +92,36 @@ async function saveLocation() {
     document.getElementById('splash-location-saved').style.display = 'block';
 }
 
+// Called by the "Skip & Enter" button.
+// If the user typed a location, attempt to look it up and save it first,
+// then start the app regardless of whether the lookup succeeded.
+async function skipAndEnter() {
+    const input = document.getElementById('splash-zip-input').value.trim();
+    if (input) {
+        const unit      = document.getElementById('splash-unit-select').value;
+        const frequency = parseInt(document.getElementById('splash-freq-select').value, 10);
+        const loadingEl = document.getElementById('splash-location-loading');
+        const errorEl   = document.getElementById('splash-location-error');
+
+        errorEl.style.display   = 'none';
+        loadingEl.style.display = 'block';
+
+        let locationData = null;
+        if (/^\d{5}$/.test(input)) locationData = await getCoordsFromZip(input);
+        if (!locationData)          locationData = await getCoordsFromCity(input);
+
+        loadingEl.style.display = 'none';
+
+        if (locationData) {
+            saveWeatherConfig({ ...locationData, unit, frequency });
+            console.log('🌤️ Location saved on skip:', locationData);
+        } else {
+            console.warn('🌤️ Could not resolve location on skip — continuing without it.');
+        }
+    }
+    startApp();
+}
+
 async function getCoordsFromZip(zip) {
     try {
         const response = await fetch(`https://api.zippopotam.us/us/${zip}`);

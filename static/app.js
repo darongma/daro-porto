@@ -90,9 +90,18 @@ async function startApp() {
 
     // 4. Display mode
     switch (cfg.mode) {
-        case "photo":  startSlideshow(); break;
-        case "video":  initVideo();      break;
-        case "hybrid": initVideo(); startSlideshow(); break;
+        case "photo":
+            startSlideshow();
+            break;
+        case "video":
+            // Pure video — initVideo() clears the slideshow container itself
+            // photo-info-stack must stay visible: video renders its metadata there
+            initVideo();
+            break;
+        case "hybrid":
+            // Hybrid — photos run the show; videos are interleaved by runSlideshowCycle
+            startSlideshow();
+            break;
         default:
             console.warn("Unknown mode, defaulting to photo.");
             startSlideshow();

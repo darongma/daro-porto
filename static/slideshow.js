@@ -56,13 +56,26 @@ function getOrientation(p) {
 
 function startSlideshow() {
     if (window.slideshowTimer) clearTimeout(window.slideshowTimer);
+    // Only hide video if it's still active (not already cleared by hybrid fade-out)
+    if (_vplayers.a && _vplayers.a.style.display !== 'none') _hideVideoPlayer();
     runSlideshowCycle();
 }
 
 // Add 'direction' parameter and 'skipAnimation' for post-swipe renders
 async function runSlideshowCycle(direction = 'next', skipAnimation = false) {
     if (cfg.mode !== "photo" && cfg.mode !== "hybrid") return;
-    
+
+    // --- HYBRID: interleave a video every N photos ---
+    if (cfg.mode === 'hybrid' && videos.length > 0) {
+        const every = cfg.video?.every ?? 5; // show a video every N photo advances
+        photosSinceLastVideo = (photosSinceLastVideo ?? 0) + 1;
+        if (photosSinceLastVideo >= every) {
+            photosSinceLastVideo = 0;
+            playOneVideo();  // hands control to video; video calls startSlideshow() when done
+            return;
+        }
+    }
+
     // Pass direction and skipAnimation down the chain
     const count = await renderCurrentSlide(direction, skipAnimation); 
     
@@ -126,7 +139,8 @@ async function renderCurrentSlide(direction = 'next', skipAnimation = false) {
         return el;
     });
 
-    await finalizeRender(container, elementsToShow, photosToShow, direction, skipAnimation);
+    // Pass fit to finalizeRender so it can set the CSS variable on the container
+    await finalizeRender(container, elementsToShow, photosToShow, direction, skipAnimation, cfg.photo.fit || 'cover');
     preloadUpcoming();
 
     isRendering = false;
@@ -134,9 +148,16 @@ async function renderCurrentSlide(direction = 'next', skipAnimation = false) {
 }
 
 // Add 'skipAnimation' as the 5th parameter — used after swipe commits
-async function finalizeRender(container, elements, photoDataArray, direction = 'next', skipAnimation = false) {
+// 'fit' drives the CSS variable --photo-fit on the container, which overrides
+// the class-level object-fit rules for single-photo (layout-1) slides.
+async function finalizeRender(container, elements, photoDataArray, direction = 'next', skipAnimation = false, fit = 'cover') {
     container.innerHTML = '';
-    container.className = `slideshow-container layout-${elements.length}`;
+    const fromVideo = container.classList.contains('from-video');
+    container.className = `slideshow-container layout-${elements.length}${fromVideo ? ' from-video' : ''}`;
+    // Expose fit as a data-attribute so CSS can target it
+    container.dataset.fit = fit;
+    // Strip from-video after the animation plays so it doesn't re-trigger on next photo
+    if (fromVideo) setTimeout(() => container.classList.remove('from-video'), 700);
     const infoStack     = document.getElementById('photo-info-stack');
     infoStack.innerHTML = '';
 
@@ -166,18 +187,18 @@ async function finalizeRender(container, elements, photoDataArray, direction = '
         const altStr = data.alt ? ` 🏔️${Math.round(data.alt)}m` : '';
 
         // Initial render: Date and Device
-        row.innerHTML = `<span>🖼️${dateStr} </span><span>📱${deviceModel}</span>`;
+        row.innerHTML = `<span>🌄${dateStr} </span><span>📱${deviceModel}</span>`;
         infoStack.appendChild(row);
 
         // LOCATION LOGIC
         if (data.location) {
             // BEST CASE: Location already in DB. Show it immediately.
-            row.innerHTML = `<span>🖼️${dateStr} </span><span>📱${deviceModel} </span><span>🛣️${data.location}</span>`;
+            row.innerHTML = `<span>🌄${dateStr} </span><span>📱${deviceModel} </span><span>🗺️${data.location}</span>`;
         } else if (data.lat && data.lon) {
             // SECOND BEST: We have coords but no name. Fetch it, then it will save to DB.
             getLocationName(data.lat, data.lon, data.url).then(locName => {
                 if (locName) {
-                    row.innerHTML = `<span>🖼️${dateStr} </span><span>📱${deviceModel} </span><span>🛣️${locName}</span> `;
+                    row.innerHTML = `<span>🌄${dateStr} </span><span>📱${deviceModel} </span><span>🗺️${locName}</span> `;
                 }
             });
         }
@@ -186,31 +207,466 @@ async function finalizeRender(container, elements, photoDataArray, direction = '
 
 
 /* ============================================================
-   VIDEO
+   VIDEO  —  Dual-Slot + Single Shared Blur Architecture
+   ─────────────────────────────────────────────────────────────
+   Elements created once:
+     · #video-blur     z-index 3  — shared blurred background (always shows
+                                    the NEXT slot's video, already buffered)
+     · #video-player-a z-index 4  — slot A sharp player
+     · #video-player-b z-index 4  — slot B sharp player
+
+   Total loads at any moment = 2 (current + next).
+   The blur is pointed at the next slot's already-loading src — zero extra
+   network cost. On transition the blur instantly switches to the new next.
+
+   Flow:
+     1. Slot A plays video N.  Blur = slot B's src (video N+1, loading).
+     2. Clip ends → fade out A, slot B fades in (already buffered = instant).
+     3. Blur switches to what will be slot A (video N+2, now loading into A).
+     4. Repeat alternating A ↔ B — always 2 video loads, 1 blur (free).
    ============================================================ */
 
+let videoClipTimer       = null;
+let videoExpanded        = false;
+let photosSinceLastVideo = 0;
+let _tapHintTimer        = null;
+
+const VIDEO_FADE_MS = 2000; // cinematic crossfade
+
+// Two player slots + one shared blur
+const _vplayers = { a: null, b: null }; // <video> elements
+let _vloaded    = { a: null, b: null }; // url currently loaded in each
+let _activeSlot = 'a';
+let _vblur      = null; // single shared blur <video>
+let _vTransitioning = false; // guard against overlapping transitions
+
+// ── One-time element creation ─────────────────────────────────────────────
+function _ensureVideoSlots() {
+    if (!_vblur) {
+        const blur         = document.createElement('video');
+        blur.id            = 'video-blur';
+        blur.muted         = true;
+        blur.playsInline   = true;
+        blur.loop          = true;
+        blur.preload       = 'auto';
+        blur.style.cssText = `
+            position:fixed; inset:0;
+            width:112%; height:112%; top:-6%; left:-6%;
+            object-fit:cover;
+            filter:blur(40px) brightness(0.45);
+            z-index:3; display:none; opacity:1;
+            transition:opacity ${VIDEO_FADE_MS}ms ease;
+            pointer-events:none;
+        `;
+        document.body.appendChild(blur);
+        _vblur = blur;
+    }
+
+    ['a', 'b'].forEach(id => {
+        if (!_vplayers[id]) {
+            const p         = document.createElement('video');
+            p.id            = `video-player-${id}`;
+            p.playsInline   = true;
+            p.preload       = 'auto';
+            p.style.cssText = `
+                position:fixed; inset:0;
+                width:100%; height:100%;
+                object-fit:contain;
+                z-index:4; display:none; opacity:0;
+                transition:opacity ${VIDEO_FADE_MS}ms ease;
+                cursor:pointer; background:transparent;
+                touch-action:none;
+            `;
+            p.addEventListener('click', _expandVideo);
+            document.body.appendChild(p);
+            _vplayers[id] = p;
+        }
+    });
+}
+
+// ── Load a URL into a player slot (background buffering, no play) ─────────
+function _loadPlayer(slotId, url) {
+    if (_vloaded[slotId] === url) return;
+    _vloaded[slotId]    = url;
+    _vplayers[slotId].src = url;
+    _vplayers[slotId].load();
+    console.log(`📦 Buffering slot-${slotId}:`, url);
+}
+
+// ── Point the shared blur at a url (already buffering in a player slot) ───
+function _setBlur(url) {
+    if (!_vblur) return;
+    if (_vblur.src !== url) {
+        _vblur.src = url;
+        _vblur.load();
+    }
+    _vblur.style.display = 'block';
+    _vblur.play().catch(() => {});
+}
+
+// ── Show a player slot ────────────────────────────────────────────────────
+// readyState:  0=HAVE_NOTHING  1=HAVE_METADATA  2=HAVE_CURRENT_DATA
+//              3=HAVE_FUTURE_DATA  4=HAVE_ENOUGH_DATA
+// For a pre-buffered slot the events already fired, so we act immediately
+// instead of waiting for events that will never come again.
+function _showPlayer(slotId, url, videoData) {
+    if (_vloaded[slotId] !== url) _loadPlayer(slotId, url); // safety net
+
+    const p            = _vplayers[slotId];
+    p.oncanplay        = null;
+    p.onloadedmetadata = null;
+    p.onended          = null;
+    p.style.display    = 'block';
+    p.style.opacity    = '0';
+
+    function _onReady() {
+        p.volume = (cfg.video?.volume ?? 20) / 100;
+        p.play().catch(() => console.warn('⚠️ Autoplay blocked'));
+        p.style.opacity = '1';
+        // Defer info render by one frame so the DOM settles
+        // (prevents race where _clearVideoInfo from a prior transition wipes this)
+        requestAnimationFrame(() => _renderVideoInfo(videoData));
+    }
+
+    function _onMeta() {
+        const clipLimit = cfg.video?.duration ?? 30;
+        const clipEnd   = Math.min(p.duration, clipLimit);
+        console.log(`⏱ slot-${slotId}: ${clipEnd.toFixed(1)}s / ${p.duration.toFixed(1)}s`);
+        p.onended = () => { _clearVideoTimer(); if (!videoExpanded) _transition(); };
+        videoClipTimer = setTimeout(() => { if (!videoExpanded) _transition(); }, clipEnd * 1000);
+        // Defer hint so it appears after any transition cleanup has settled
+        if (clipEnd < p.duration) requestAnimationFrame(_showTapHint);
+    }
+
+    // Already has enough data to play — act now, don't wait for events
+    if (p.readyState >= 3) {
+        _onReady();
+    } else {
+        p.oncanplay = () => { p.oncanplay = null; _onReady(); };
+    }
+
+    // Already has metadata — act now
+    if (p.readyState >= 1) {
+        _onMeta();
+    } else {
+        p.onloadedmetadata = () => { p.onloadedmetadata = null; _onMeta(); };
+    }
+}
+
+// ── Hide a player slot (fade, pause, keep src) ────────────────────────────
+function _hidePlayer(slotId) {
+    const p              = _vplayers[slotId];
+    p.style.opacity      = '0';
+    p.oncanplay          = null;
+    p.onloadedmetadata   = null;
+    p.onended            = null;
+    setTimeout(() => {
+        p.pause();
+        p.style.display  = 'none';
+    }, VIDEO_FADE_MS);
+}
+
+// ── Fully clear a player slot ─────────────────────────────────────────────
+function _clearPlayer(slotId) {
+    const p            = _vplayers[slotId];
+    if (!p) return;
+    p.oncanplay        = null;
+    p.onloadedmetadata = null;
+    p.onended          = null;
+    p.pause();
+    p.src              = '';
+    p.style.display    = 'none';
+    p.style.opacity    = '0';
+    _vloaded[slotId]   = null;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
 function initVideo() {
-    const videoEl = document.getElementById('bg-video');
-    if (videos.length === 0) { console.log("❌ No videos found."); return; }
+    if (videos.length === 0) { console.log('❌ No videos found.'); return; }
+    _ensureVideoSlots();
+    videoExpanded   = false;
+    _activeSlot     = 'a';
+    _vTransitioning = false;
+    _clearVideoTimer();
 
-    videoEl.volume = (cfg.video.volume || 20) / 100;
+    // Clear photo layer immediately — prevents it bleeding through during video
+    const container = document.getElementById('slideshow-container');
+    if (container) container.innerHTML = '';
 
-    const playNextVideo = () => {
-        if (videos.length === 0) return;
-        videoEl.src = videos[currentVideoIndex];
-        console.log("🎬 Playing:", videos[currentVideoIndex]);
-        videoEl.play().catch(() => console.warn("Video autoplay blocked."));
+    const curData  = videos[currentVideoIndex];
+    const nextData = videos.length > 1 ? videos[(currentVideoIndex + 1) % videos.length] : null;
+
+    // Buffer current into slot A, next into slot B simultaneously
+    _loadPlayer('a', curData.url);
+    if (nextData) _loadPlayer('b', nextData.url);
+
+    // Blur shows the NEXT video (already buffering in slot B — free)
+    if (nextData) _setBlur(nextData.url);
+    else          _setBlur(curData.url); // only one video: blur = same
+
+    console.log(`🎬 Playing ${currentVideoIndex + 1}/${videos.length}: slot-a →`, curData.url);
+    _showPlayer('a', curData.url, curData);
+    _initVideoSwipe();
+}
+
+// ── Transition: swap A ↔ B ────────────────────────────────────────────────
+function _transition(direction = 'next') {
+    if (_vTransitioning) return; // prevent overlapping fades
+    _vTransitioning = true;
+    _clearVideoTimer();
+    videoExpanded = false;
+    _hideTapHint();
+
+    const outSlot = _activeSlot;
+    _activeSlot   = _activeSlot === 'a' ? 'b' : 'a';
+    const inSlot  = _activeSlot;
+
+    if (direction === 'prev') {
+        currentVideoIndex = (currentVideoIndex - 1 + videos.length) % videos.length;
+    } else {
         currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-    };
+    }
 
-    videoEl.onended = playNextVideo;
-    playNextVideo();
+    if (cfg.mode === 'hybrid') {
+        // Fade out all video elements, THEN hand control to photos
+        const pOut = _vplayers[outSlot];
+        if (pOut) pOut.style.opacity = '0';
+        if (_vblur) _vblur.style.opacity = '0';
+        setTimeout(() => {
+            _clearPlayer('a');
+            _clearPlayer('b');
+            if (_vblur) {
+                _vblur.pause();
+                _vblur.src             = '';
+                _vblur.style.display   = 'none';
+                _vblur.style.opacity   = '1';
+            }
+            _clearVideoInfo();
+            _vTransitioning = false;
+            const c = document.getElementById('slideshow-container');
+            if (c) c.classList.add('from-video');
+            startSlideshow();
+        }, VIDEO_FADE_MS);
+        return;
+    }
+
+    const curData  = videos[currentVideoIndex];
+    // For prev, pre-load the video before current; for next, the one after
+    const preloadIdx = direction === 'prev'
+        ? (currentVideoIndex - 1 + videos.length) % videos.length
+        : (currentVideoIndex + 1) % videos.length;
+    const preloadData = videos.length > 1 ? videos[preloadIdx] : null;
+
+    console.log(`🎬 Transition ${direction} → slot-${inSlot}:`, curData.url);
+
+    // Load the new video into the incoming slot and show it
+    _loadPlayer(inSlot, curData.url);
+    _showPlayer(inSlot, curData.url, curData);
+
+    // Fade out outgoing slot simultaneously
+    _hidePlayer(outSlot);
+
+    // After fade, load the next-to-play into the idle slot and update blur
+    if (preloadData) {
+        setTimeout(() => {
+            _loadPlayer(outSlot, preloadData.url);
+            _setBlur(preloadData.url);
+            _vTransitioning = false;
+        }, VIDEO_FADE_MS + 100);
+    } else {
+        setTimeout(() => { _vTransitioning = false; }, VIDEO_FADE_MS + 100);
+    }
+}
+
+// ── Expand (tap to watch past clip limit) ────────────────────────────────
+function _expandVideo() {
+    if (videoExpanded) return;
+    videoExpanded = true;
+    _clearVideoTimer();
+    _hideTapHint();
+    console.log('👆 Watching full video');
+}
+
+// ── Public entry points ───────────────────────────────────────────────────
+function playOneVideo() {
+    if (videos.length === 0) { startSlideshow(); return; }
+    initVideo();
+}
+
+function _hideVideoPlayer() {
+    if (!_vplayers.a) return;
+    _destroyVideoSwipe();
+    _clearPlayer('a');
+    _clearPlayer('b');
+    if (_vblur) { _vblur.pause(); _vblur.src = ''; _vblur.style.display = 'none'; }
+    _clearVideoInfo();
+    _hideTapHint();
+    _clearVideoTimer();
+}
+
+function _showVideoPlayer() { _ensureVideoSlots(); }
+
+function _clearVideoTimer() {
+    if (videoClipTimer) { clearTimeout(videoClipTimer); videoClipTimer = null; }
+}
+
+function _hidePhotoSlideshow() {
+    if (window.slideshowTimer) { clearTimeout(window.slideshowTimer); window.slideshowTimer = null; }
+    const c = document.getElementById('slideshow-container');
+    if (c) c.innerHTML = '';
+    // Note: do NOT clear video info here — video renders its own info when ready
+}
+
+// ── Video info stack — mirrors photo layout exactly ───────────────────────
+function _renderVideoInfo(data) {
+    const stack = document.getElementById('photo-info-stack');
+    if (!stack || !data) return;
+    stack.innerHTML = '';
+
+    const row       = document.createElement('div');
+    row.className   = 'info-row';
+    const dateStr   = formatSingleDate(data.date);         // reuse photo helper
+    const deviceStr = cleanDeviceName(data.device);        // reuse photo helper
+
+    // Initial render: date + device (same pattern as photos)
+    row.innerHTML = `<span>🎬${dateStr} </span><span>📱${deviceStr}</span>`;
+    stack.appendChild(row);
+
+    // Location: same three-tier logic as photos
+    if (data.location) {
+        row.innerHTML = `<span>🎬${dateStr} </span><span>📱${deviceStr} </span><span>🗺️${data.location}</span>`;
+    } else if (data.lat && data.lon) {
+        getLocationName(data.lat, data.lon, data.url).then(locName => {
+            if (locName) {
+                row.innerHTML = `<span>🎬${dateStr} </span><span>📱${deviceStr} </span><span>🗺️${locName}</span>`;
+            }
+        });
+    }
+}
+
+function _clearVideoInfo() {
+    const stack = document.getElementById('photo-info-stack');
+    if (stack) stack.innerHTML = '';
+}
+
+// ── Tap hint ──────────────────────────────────────────────────────────────
+function _showTapHint() {
+    let hint = document.getElementById('video-tap-hint');
+    if (!hint) {
+        hint             = document.createElement('div');
+        hint.id          = 'video-tap-hint';
+        hint.textContent = '👆 Tap to watch full video';
+        document.body.appendChild(hint);
+    }
+    hint.classList.add('visible');
+    if (_tapHintTimer) clearTimeout(_tapHintTimer);
+    _tapHintTimer = setTimeout(_hideTapHint, 3000);
+}
+
+function _hideTapHint() {
+    const hint = document.getElementById('video-tap-hint');
+    if (hint) hint.classList.remove('visible');
 }
 
 
-/* ============================================================
-   PHOTO HELPERS
-   ============================================================ */
+
+
+
+
+
+// ── Video swipe gestures ──────────────────────────────────────────────────
+// Horizontal swipe on the video players directly (not body) to avoid the
+// browser's native video touch handling stealing events.
+const VSWIPE = {
+    active:     false,
+    startX:     0,
+    startY:     0,
+    deltaX:     0,
+    isVertical: false,
+    THRESHOLD:  0.20, // fraction of screen width to commit
+    FLING_VEL:  0.25, // px/ms
+    lastX:      0,
+    lastTs:     0,
+    velocityX:  0,
+};
+
+function _videoSwipeStart(e) {
+    const t          = e.changedTouches[0];
+    VSWIPE.active    = true;
+    VSWIPE.isVertical = false;
+    VSWIPE.deltaX    = 0;
+    VSWIPE.velocityX = 0;
+    VSWIPE.startX    = t.clientX;
+    VSWIPE.startY    = t.clientY;
+    VSWIPE.lastX     = t.clientX;
+    VSWIPE.lastTs    = e.timeStamp;
+}
+
+function _videoSwipeMove(e) {
+    if (!VSWIPE.active) return;
+    const t  = e.changedTouches[0];
+    const dx = t.clientX - VSWIPE.startX;
+    const dy = t.clientY - VSWIPE.startY;
+
+    // Axis lock — wait for 8px of movement before deciding direction
+    if (!VSWIPE.isVertical && Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    if (!VSWIPE.isVertical) {
+        if (Math.abs(dy) > Math.abs(dx)) { VSWIPE.isVertical = true; return; }
+    }
+    if (VSWIPE.isVertical) return;
+
+    e.preventDefault();
+    const dt         = Math.max(e.timeStamp - VSWIPE.lastTs, 1);
+    VSWIPE.velocityX = (t.clientX - VSWIPE.lastX) / dt;
+    VSWIPE.lastX     = t.clientX;
+    VSWIPE.lastTs    = e.timeStamp;
+    VSWIPE.deltaX    = dx;
+}
+
+function _videoSwipeEnd(e) {
+    if (!VSWIPE.active || VSWIPE.isVertical) { VSWIPE.active = false; return; }
+    VSWIPE.active = false;
+    if (videos.length <= 1) return;
+
+    const dx  = VSWIPE.deltaX;
+    const vel = VSWIPE.velocityX;
+    const w   = window.innerWidth;
+
+    const distCommit = Math.abs(dx) > w * VSWIPE.THRESHOLD;
+    const velCommit  = Math.abs(vel) > VSWIPE.FLING_VEL;
+
+    if (distCommit || velCommit) {
+        _vTransitioning = false; // allow swipe to override an in-progress auto-transition
+        _transition(dx < 0 ? 'next' : 'prev');
+    }
+}
+
+function _initVideoSwipe() {
+    // Attach to both player elements directly — this avoids the browser's
+    // native video touch handling (timeline scrub etc.) consuming the events
+    ['a', 'b'].forEach(id => {
+        const p = _vplayers[id];
+        if (!p) return;
+        p.addEventListener('touchstart',  _videoSwipeStart,  { passive: true });
+        p.addEventListener('touchmove',   _videoSwipeMove,   { passive: false });
+        p.addEventListener('touchend',    _videoSwipeEnd,    { passive: true });
+        p.addEventListener('touchcancel', () => { VSWIPE.active = false; }, { passive: true });
+    });
+}
+
+function _destroyVideoSwipe() {
+    ['a', 'b'].forEach(id => {
+        const p = _vplayers[id];
+        if (!p) return;
+        p.removeEventListener('touchstart',  _videoSwipeStart);
+        p.removeEventListener('touchmove',   _videoSwipeMove);
+        p.removeEventListener('touchend',    _videoSwipeEnd);
+    });
+    // Also clean up body listeners from any legacy calls
+    document.body.removeEventListener('touchstart',  _videoSwipeStart);
+    document.body.removeEventListener('touchmove',   _videoSwipeMove);
+    document.body.removeEventListener('touchend',    _videoSwipeEnd);
+}
 
 function cleanDeviceName(name) {
     if (!name || name === "Unknown Device") return "Camera";

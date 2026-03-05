@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daro Porto</title>
     <link rel="icon" type="image/png" href="/static/icon.png">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v={{ v }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
 </head>
@@ -86,13 +86,13 @@
                 <div id="splash-location-error" class="splash-error" style="display:none;"></div>
                 <div id="splash-location-loading" class="splash-loading" style="display:none;">🔍 Looking up your location...</div>
             </div>
-            <button class="splash-enter-btn splash-enter-btn--secondary" onclick="startApp()">Skip &amp; Enter</button>
+            <button class="splash-enter-btn splash-enter-btn--secondary" onclick="skipAndEnter()">Skip &amp; Enter</button>
         </div>
 
     </div>
 </div>
 
-    <video id="bg-video" loop muted autoplay playsinline class="bg-video"></video>
+    
 
     <div id="slideshow-container" class="slideshow-container">
         </div>
@@ -233,10 +233,10 @@
         </div>
     </div>
 
-    <script src="/static/app.js"></script>
-    <script src="/static/ui.js"></script>
-    <script src="/static/music.js"></script>
-    <script src="/static/weather.js"></script>
-    <script src="/static/slideshow.js"></script>
+    <script src="/static/app.js?v={{ v }}"></script>
+    <script src="/static/ui.js?v={{ v }}"></script>
+    <script src="/static/music.js?v={{ v }}"></script>
+    <script src="/static/weather.js?v={{ v }}"></script>
+    <script src="/static/slideshow.js?v={{ v }}"></script>
 </body>
 </html>

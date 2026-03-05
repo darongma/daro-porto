@@ -639,5 +639,42 @@ async def fetch_from_nominatim(lat, lon, async_client):
     return ", ".join(parts) if parts else None
 
 
+def list_geocache_entries():
+    db_path = GEO_DB
+    try:
+        # 2. Connect to the database
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # 3. Fetch all entries, sorted by most recent first
+        cursor.execute("SELECT lat_key, lon_key, location_name, timestamp FROM geo_cache ORDER BY timestamp DESC")
+        rows = cursor.fetchall()
+
+        if not rows:
+            print("📅 The database is empty.")
+            return
+
+        # 4. Print Table Header
+        print(f"{'LAT':<10} | {'LON':<10} | {'LOCATION':<40} | {'DATE ADDED'}")
+        print("-" * 85)
+
+        # 5. Print Rows
+        for lat, lon, name, ts in rows:
+            print(f"{lat:<10} | {lon:<10} | {name:<40} | {ts}")
+
+        print("-" * 85)
+        print(f"Total Cached Locations: {len(rows)}")
+
+    except sqlite3.Error as e:
+        print(f"❌ SQLite Error: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+
+
+
+
+
 # Run initialization on import
 init_geo_db()

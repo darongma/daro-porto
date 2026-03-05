@@ -137,3 +137,44 @@ def update_photo_location_db(url: str, location: str) -> bool:
     except Exception as e:
         show_message(f"❌ DB Update Error: {e}")
         return False
+    
+
+
+def print_photos_with_location():
+    
+    """Prints all photo entries that have a location assigned."""
+    if not DB_PATH.exists():
+        print(f"❌ Error: {DB_PATH} not found.")
+        return
+
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            # We filter for rows where location is NOT NULL and not an empty string
+            query = """
+                SELECT filepath, location, lat, lon 
+                FROM photos 
+                WHERE location IS NOT NULL AND location != ''
+            """
+            cursor = conn.execute(query)
+            rows = cursor.fetchall()
+
+            if not rows:
+                print("📂 No photos have locations set yet.")
+                return
+
+            print(f"{'FILENAME':<30} | {'LOCATION':<40} | {'COORDS'}")
+            print("-" * 90)
+
+            # enumerate(rows, 1) starts the counter at 1
+            for index, (path, loc, lat, lon) in enumerate(rows, 1):
+                filename = Path(path).name
+                coords = f"{lat}, {lon}"
+                
+                # Print row with index
+                print(f"{index:<4} | {filename[:30]:<30} | {loc[:40]:<40} | {coords}")
+
+            print("-" * 90)
+            print(f"Total photos with locations: {len(rows)}")
+
+    except sqlite3.Error as e:
+        print(f"❌ SQLite Error: {e}")

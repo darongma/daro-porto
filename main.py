@@ -2,11 +2,12 @@ import os
 import sys
 import socket
 import psutil
+import mimetypes
 from pathlib import Path
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from fastapi.concurrency import run_in_threadpool
 from contextlib import asynccontextmanager
 
@@ -14,6 +15,7 @@ from config       import BASE_DIR, load_config, save_config, show_message
 from media_mounter import mount_multiple, list_media_files, get_folder_stats
 from photo        import scan_photos, update_photo_location_db, init_photo_db
 from music        import scan_music_metadata, build_music_list
+from video        import scan_videos, update_video_location_db, init_video_db
 import lyrics
 
 import httpx
@@ -21,10 +23,15 @@ import geo
 
 # --- PATHS ---
 STATIC_DIR       = BASE_DIR / "static"
-PHOTO_META_FILE  = BASE_DIR / "photo_meta.json"
 MUSIC_META_FILE  = BASE_DIR / "music_meta.json"
 MUSIC_ART_DIR    = BASE_DIR / "music_art"
 MUSIC_ART_DIR.mkdir(exist_ok=True)
+
+
+def list_video_paths(folders: list) -> list[Path]:
+    """Convert video folder strings to Path objects (no StaticFiles mount needed —
+    videos are served by the range-streaming endpoint)."""
+    return [Path(f) for f in folders if Path(f).exists()]
 
 # --- GLOBALS ---
 config_data    = load_config()
@@ -40,12 +47,14 @@ VIDEO_PATHS    = []
 async def lifespan(app: FastAPI):
     global media_cache, music_metadata, PHOTO_PATHS, MUSIC_PATHS, VIDEO_PATHS
 
-    # Mount folders
+    # Mount folders — photos and music via StaticFiles (small files, no range needed)
+    # Videos are served by the range-streaming endpoint below, NOT StaticFiles
     PHOTO_PATHS = mount_multiple(app, config_data.get("photo", {}).get("folders", []), "photos")
     MUSIC_PATHS = mount_multiple(app, config_data.get("music", {}).get("folders", []), "music")
-    VIDEO_PATHS = mount_multiple(app, config_data.get("video", {}).get("folders", []), "videos")
+    VIDEO_PATHS = list_video_paths(config_data.get("video", {}).get("folders", []))
 
     init_photo_db()
+    init_video_db()
 
     # Scan music metadata — respects extensions from config
     music_metadata = scan_music_metadata(
@@ -57,6 +66,11 @@ async def lifespan(app: FastAPI):
 
     # Full media scan
     _run_scan()
+
+
+    # Start a timer to open the browser 1.5 seconds after uvicorn starts
+    # This ensures the server is actually "up" before the window opens
+    Timer(3.0, _open_browser, args=[server_url]).start()
 
     yield
 
@@ -73,6 +87,94 @@ app.mount("/music_art",  StaticFiles(directory=str(MUSIC_ART_DIR)), name="music_
 templates = Jinja2Templates(directory=str(STATIC_DIR))
 
 
+# =====================================================================
+# VIDEO STREAMING  — proper HTTP Range support for smooth playback
+# Replaces StaticFiles for /media/videos_* — same URL pattern, but
+# responds with 206 Partial Content so browsers can:
+#   · start playback immediately from first bytes
+#   · pre-buffer efficiently without downloading whole files
+#   · seek without re-downloading from the start
+# =====================================================================
+
+VIDEO_CHUNK = 1024 * 512  # 512 KB chunks
+
+
+@app.get("/media/videos_{folder_index}/{filename}")
+async def stream_video(folder_index: int, filename: str, request: Request):
+    # Resolve file path from the in-memory VIDEO_PATHS list
+    if folder_index >= len(VIDEO_PATHS):
+        raise HTTPException(status_code=404, detail="Video folder not found")
+
+    file_path = VIDEO_PATHS[folder_index] / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Video file not found")
+
+    file_size   = file_path.stat().st_size
+    mime_type   = mimetypes.guess_type(filename)[0] or "video/mp4"
+    range_header = request.headers.get("Range")
+
+    # ── No Range header → send full file (rare, but handle it) ──────────
+    if not range_header:
+        def full_iter():
+            with open(file_path, "rb") as f:
+                while chunk := f.read(VIDEO_CHUNK):
+                    yield chunk
+
+        return StreamingResponse(
+            full_iter(),
+            status_code=200,
+            media_type=mime_type,
+            headers={
+                "Content-Length":      str(file_size),
+                "Accept-Ranges":       "bytes",
+                "Cache-Control":       "no-cache",
+            }
+        )
+
+    # ── Parse Range: bytes=start-end ────────────────────────────────────
+    try:
+        range_val   = range_header.replace("bytes=", "")
+        range_start, range_end = range_val.split("-")
+        range_start = int(range_start)
+        range_end   = int(range_end) if range_end else file_size - 1
+    except Exception:
+        raise HTTPException(status_code=416, detail="Invalid Range header")
+
+    # Clamp to file bounds
+    range_end  = min(range_end, file_size - 1)
+    chunk_size = range_end - range_start + 1
+
+    if range_start > range_end or range_start >= file_size:
+        raise HTTPException(
+            status_code=416,
+            detail="Range Not Satisfiable",
+            headers={"Content-Range": f"bytes */{file_size}"}
+        )
+
+    def range_iter():
+        remaining = chunk_size
+        with open(file_path, "rb") as f:
+            f.seek(range_start)
+            while remaining > 0:
+                data = f.read(min(VIDEO_CHUNK, remaining))
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    return StreamingResponse(
+        range_iter(),
+        status_code=206,
+        media_type=mime_type,
+        headers={
+            "Content-Range":  f"bytes {range_start}-{range_end}/{file_size}",
+            "Content-Length": str(chunk_size),
+            "Accept-Ranges":  "bytes",
+            "Cache-Control":  "no-cache",
+        }
+    )
+
+
 # --- INTERNAL SCAN LOGIC ---
 def _run_scan():
     """Runs a full media scan and updates media_cache. Extensions come from config."""
@@ -85,7 +187,7 @@ def _run_scan():
 
     photos = scan_photos(PHOTO_PATHS, photo_exts)
     music  = build_music_list(MUSIC_PATHS, music_exts, music_metadata)
-    videos = list_media_files(VIDEO_PATHS, "videos", video_exts)
+    videos = scan_videos(VIDEO_PATHS, video_exts)
 
     media_cache = {"photos": photos, "music": music, "videos": videos}
     show_message(f"✅ Scan complete — {len(photos)} photos, {len(music)} tracks, {len(videos)} videos")
@@ -98,9 +200,18 @@ def _run_scan():
 
 
 
+import time
+
+def _get_cache_bust() -> str:
+    """In dev mode: timestamp changes every restart, busting the cache.
+       In prod mode: use the fixed version string from config.json."""
+    if config_data.get("dev", False):
+        return str(int(time.time()))
+    return config_data.get("version", "1.0.0")
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request, "v": _get_cache_bust()})
 
 
 @app.get("/api/lyrics")
@@ -133,14 +244,16 @@ async def proxy_geocode(lat: float, lon: float, url: str):
 
         # 3. Handle successful finding (either from cache or API)
         if location_name:
-            # Update your existing photo DB
+        
             await run_in_threadpool(update_photo_location_db, url, location_name)
+            await run_in_threadpool(update_video_location_db, url, location_name)
             
-            # Update Memory Cache for UI
-            for photo in media_cache.get("photos", []):
-                if photo["url"] == url:
-                    photo["location"] = location_name
-                    break
+            # Update the memory cache so the UI sees it immediately
+            for media_type in ["photos", "videos"]:
+                for item in media_cache.get(media_type, []):
+                    if item["url"] == url:
+                        item["location"] = location_name
+                        break
             
             return {"location": location_name}
         
@@ -180,7 +293,7 @@ async def update_settings(request: Request):
 
         PHOTO_PATHS = mount_multiple(app, config_data.get("photo", {}).get("folders", []), "photos")
         MUSIC_PATHS = mount_multiple(app, config_data.get("music", {}).get("folders", []), "music")
-        VIDEO_PATHS = mount_multiple(app, config_data.get("video", {}).get("folders", []), "videos")
+        VIDEO_PATHS = list_video_paths(config_data.get("video", {}).get("folders", []))
 
         # Re-index music with updated extensions from new config
         music_metadata = scan_music_metadata(
@@ -300,8 +413,6 @@ if __name__ == "__main__":
     show_message(f"URL      : {server_url}")
     show_message("=" * 50)
 
-    # Start a timer to open the browser 1.5 seconds after uvicorn starts
-    # This ensures the server is actually "up" before the window opens
-    Timer(3.0, _open_browser, args=[server_url]).start()
+
 
     uvicorn.run(app, host="0.0.0.0", port=8000)

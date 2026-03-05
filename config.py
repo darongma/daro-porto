@@ -21,10 +21,12 @@ DEFAULT_CONFIG = {
         "extensions": [".jpg", ".jpeg", ".png", ".webp"]
     },
     "video": {
+        "duration": 45,
         "volume":     20,
+        "every":7,
         "shuffle":    True,
         "folders":    ["./media/videos"],
-        "extensions": [".mp4", ".mov", ".avi"]
+        "extensions": [".mp4", ".mov"]
     }
 }
 

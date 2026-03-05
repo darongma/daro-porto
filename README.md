@@ -63,7 +63,7 @@ Place your files in the following folders:
 
 🎵 Music: /media/music (".mp3")
 
-🎥 Videos: /media/videos (".mp4",".mov",".avi", Video Will Be Supported Soon!!!)
+🎥 Videos: /media/videos (".mp4",".mov", Video Will Be Supported Soon!!!)
 
 🚀 How to Run
 1. Launch the Server
