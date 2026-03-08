@@ -351,6 +351,7 @@ function renderCredits(titleEl, bodyEl) {
             <div><span style="color:#50fa7b">🧑‍💼</span> <b>Name:</b> Darong Ma</div>
             <div><span style="color:#50fa7b">📧</span> <b>Email:</b> <a href="mailto:darongma@yahoo.com" style="color:#8be9fd; text-decoration:none;">darongma@yahoo.com</a></div>
             <div><span style="color:#50fa7b">🌐</span> <b>Web:</b> <a href="https://darongma.com" target="_blank" style="color:#8be9fd; text-decoration:none;">darongma.com</a></div>
+            <div><span style="color:#50fa7b">☕</span> <b>Buy Me a Coffee:</b> <a href="https://paypal.me/darongma" target="_blank" style="color:#8be9fd; text-decoration:none;">paypal.me/darongma</a></div>
         </div>`;
 
     const gitContent = `
