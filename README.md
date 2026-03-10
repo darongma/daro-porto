@@ -31,20 +31,6 @@ If you do not want to run your own python fastapi server, here is the online ver
 
 ![App Screenshot](screenshots/IMG_0707.JPG)
 
-![App Screenshot](screenshots/IMG_0003.PNG)
-
-![App Screenshot](screenshots/IMG_0004.PNG)
-
-![App Screenshot](screenshots/IMG_0015.PNG)
-
-![App Screenshot](screenshots/IMG_0017.PNG)
-
-![App Screenshot](screenshots/IMG_0018.PNG)
-
-![App Screenshot](screenshots/IMG_0020.PNG)
-
-![App Screenshot](screenshots/IMG_0021.PNG)
-
 
 ## 🛠️ How to Install
 
