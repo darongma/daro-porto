@@ -405,7 +405,8 @@ def _open_browser(url: str):
 if __name__ == "__main__":
     import uvicorn
     ip = _get_local_ip()
-    server_url = f"http://{ip}:8000"
+    port=config_data.get("port", 8000)
+    server_url = f"http://{ip}:{port}"
     
     show_message("\n" + "=" * 50)
     show_message("DARO PORTO SERVER STARTING")
@@ -415,4 +416,4 @@ if __name__ == "__main__":
 
 
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)
